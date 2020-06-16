@@ -45,7 +45,7 @@ white_key_width = width / 7
 
 # Reset display to wrap around the keyboard image
 
-screen = pygame.display.set_mode((OCTAVES * width, height + 20))
+screen = pygame.display.set_mode((OCTAVES * width, height))
 
 if key_graphic.get_alpha() is None:
     image = key_graphic.convert()
@@ -53,19 +53,13 @@ else:
     image = key_graphic.convert_alpha()
 
 pygame.display.set_caption("mingus piano")
-current_octave = 4
+current_octave = 3
 current_channel = 8
 
 # pressed is a surface that is used to show where a key has been pressed
 
 pressed = pygame.Surface((white_key_width, height))
 pressed.fill((0, 230, 0))
-
-# text is the surface displaying the determined chord
-
-text = pygame.Surface((width * OCTAVES, 20))
-text.fill((255, 255, 255))
-quit = False
 
 
 class NoteCtl:
@@ -144,7 +138,7 @@ note_ctl = NoteCtl()
 
 keyboard_layout = [
     ("asdfghjkl;'\\", "`zxcvbnm,./"),
-    ("1234567890-=\b", "\tqwertyuiop[]\n"),
+    ("1234567890-=\b", "\tqwertyuiop[]\r"),
 ]
 
 key_mapping = {}
@@ -162,7 +156,35 @@ for octave_shift, (black_line, white_line) in enumerate(keyboard_layout):
             i_rel -= 1
         assert 0 <= i_rel < 5
         key_mapping[ord(c)] = (BLACK_KEYS[i_rel], octave_shift + i // len(WHITE_KEYS))
+key_reverse_mapping = {octave_note: chr(key) for key, octave_note in key_mapping.items()}
+max_shift = max(oct_sh for n, oct_sh in key_mapping.values())
 
+# text is the surface displaying the note names and corresponding keyboard key
+text = pygame.Surface((width * OCTAVES, 40), pygame.SRCALPHA)
+
+
+def redraw_note_names():
+    text.fill((255, 255, 255, 0))
+    for octave in range(LOWEST, LOWEST + OCTAVES):
+        offset = width * (octave - LOWEST)
+        for n, notename in enumerate(WHITE_KEYS):
+            note_offset = offset + n * white_key_width + (white_key_width // 2)
+            note_text = f"{notename}{octave}"
+            note_glyph = font.render(note_text, 2, (0, 0, 0))
+            text.blit(note_glyph, (note_offset - note_glyph.get_width() // 2, 0))
+            # key_key = (notename, current_octave - octave, )
+            if current_octave <= octave <= current_octave + max_shift:
+                key_text = key_reverse_mapping[notename, octave - current_octave]
+                if key_text == "\t":
+                    key_text = "Tab"
+                elif key_text == "\n" or key_text == "\r":
+                    key_text = "Ent"
+                key_glyph = font.render(key_text, 2, (0, 0, 0))
+                text.blit(key_glyph, (note_offset - key_glyph.get_width() // 2, 20))
+
+
+redraw_note_names()
+quit = False
 
 while not quit:
 
@@ -173,7 +195,7 @@ while not quit:
 
     # Blit the text surface
 
-    screen.blit(text, (0, height))
+    screen.blit(text, (0, height - text.get_height()))
 
     note_ctl.tick()
 
@@ -186,13 +208,15 @@ while not quit:
             if event.key in key_mapping:
                 note_n, octave_sh = key_mapping[event.key]
                 note_ctl.play_note(note_n, current_octave + octave_sh)
-            elif event.key == pygame.K_MINUS:
+            elif event.key == pygame.K_LEFT:
                 current_octave -= 1
-            elif event.key == pygame.K_EQUALS:
+                redraw_note_names()
+            elif event.key == pygame.K_RIGHT:
                 current_octave += 1
-            elif event.key == pygame.K_BACKSPACE:
+                redraw_note_names()
+            elif event.key == pygame.K_DOWN:
                 current_channel -= 1
-            elif event.key == pygame.K_BACKSLASH:
+            elif event.key == pygame.K_UP:
                 current_channel += 1
             elif event.key == pygame.K_ESCAPE:
                 quit = True
